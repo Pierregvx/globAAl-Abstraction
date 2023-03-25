@@ -3,8 +3,11 @@ pragma solidity ^0.8.12;
 
 /* solhint-disable reason-string */
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "../../core/BasePaymaster.sol";
+import "./ITokenPayMaster.sol";
+import "./MasterPayMaster.sol";
+import {IConnext} from "@connext/interfaces/core/IConnext.sol";
 
 /**
  * A sample paymaster that defines itself as a token to pay for gas.
@@ -18,78 +21,50 @@ import "../../core/BasePaymaster.sol";
  * - Possible workarounds are either use a more complex paymaster scheme (e.g. the DepositPaymaster) or
  *   to whitelist the account and the called method ids.
  */
-contract WETHPaymaster is BasePaymaster, ERC20 {
+contract TokenPayMaster is BasePaymaster, ERC721,MasterPayMaster {
     //calculated cost of the postOp
     uint256 public constant COST_OF_POST = 15000;
     //2**16 = 65536
     address public immutable theFactory;
-    enum StandardType {
-        ERC4337,
-        SAFE,
-        ZKSYNC
-    }
-    struct Account {
-        uint16 weight;
-        uint8 chainID;
-        address accountAddress;
-        StandardType standardType;
-    }
+    
+
+    mapping(uint256 => uint256) public bondReserve;
     uint256 public reserve = 0.01 ether;
     uint256 public freezingPoint = 0.001 ether;
     error InsufficientReserve();
 
     constructor(
         address accountFactory,
-        IEntryPoint _entryPoint
-    ) ERC20("fees wrapped ether", "fWETH") BasePaymaster(_entryPoint) {
+        IEntryPoint _entryPoint,
+        address _connext
+    ) ERC721("fees wrapped ether", "fWETH") BasePaymaster(_entryPoint) MasterPayMaster(_connext) {
         theFactory = accountFactory;
         //make it non-empty
         _mint(address(this), 1);
-
-        //owner is allowed to withdraw tokens from the paymaster's balance
-        _approve(address(this), msg.sender, type(uint).max);
     }
 
     /**
-     * helpers for owner, to mint and withdraw tokens.
+     * create a new account.
+     * the account is created with a pre-funded balance of tokens.
+     * the paymaster is the owner of the account.
+     *
      */
-    //  
-    function mintTokens() external payable {
-        if (msg.value < reserve) revert InsufficientReserve();
-
-        entryPoint.depositTo{value: msg.value}(address(this));
-        _mint(msg.sender, msg.value);
-    }
-    function burn()external payable{
-        require(balanceOf(msg.sender)>0);
-        entryPoint.withdrawTo(payable(msg.sender),balanceOf(msg.sender));
-    }
-    function callL2Balances()external {
-
+    function createBond(address to) external payable {
+        _mint(to, uint256(keccak256(abi.encode(to))));
+        
+        _topUpBond(to, msg.value);
     }
 
-    // /**
-    //  * transfer paymaster ownership.
-    //  * owner of this paymaster is allowed to withdraw funds (tokens transferred to this paymaster's balance)
-    //  * when changing owner, the old owner's withdrawal rights are revoked.
-    //  */
-    // function transferOwnership(
-    //     address newOwner
-    // ) public virtual override onlyOwner {
-    //     // remove allowance of current owner
-    //     _approve(address(this), owner(), 0);
-    //     super.transferOwnership(newOwner);
-    //     // new owner is allowed to withdraw tokens from the paymaster's balance
-    //     _approve(address(this), newOwner, type(uint).max);
-    // }
+    function topUpBond(address to) external payable {
+        _topUpBond(to, msg.value);
+    }
 
-    // //Note: this method assumes a fixed ratio of token-to-eth. subclass should override to supply oracle
-    // // or a setter.
-    // function getTokenValueOfEth(
-    //     uint256 valueEth
-    // ) internal view virtual returns (uint256 valueToken) {
-    //     return valueEth / 100;
-    // }
+    function _topUpBond(address to, uint256 amount) private {
+        bondReserve[uint256(keccak256(abi.encode(to)))] += amount;
+    }
+
+
+
 
     /**
      * validate the request:
@@ -117,14 +92,16 @@ contract WETHPaymaster is BasePaymaster, ERC20 {
         );
 
         if (userOp.initCode.length != 0) {
-            _validateConstructor(userOp);
+            // _validateConstructor(userOp);
             require(
-                balanceOf(userOp.sender) >= tokenPrefund,
+                bondReserve[uint256(keccak256(abi.encode(userOp.sender)))] >=
+                    tokenPrefund,
                 "TokenPaymaster: no balance (pre-create)"
             );
         } else {
             require(
-                balanceOf(userOp.sender) >= tokenPrefund,
+                bondReserve[uint256(keccak256(abi.encode(userOp.sender)))] >=
+                    tokenPrefund,
                 "TokenPaymaster: no balance"
             );
         }
@@ -134,12 +111,12 @@ contract WETHPaymaster is BasePaymaster, ERC20 {
 
     // when constructing an account, validate constructor code and parameters
     // we trust our factory (and that it doesn't have any other public methods)
-    function _validateConstructor(
-        UserOperation calldata userOp
-    ) internal view virtual {
-        address factory = address(bytes20(userOp.initCode[0:20]));
-        require(factory == theFactory, "TokenPaymaster: wrong account factory");
-    }
+    // function _validateConstructor(
+    //     UserOperation calldata userOp
+    // ) internal view virtual {
+    //     address factory = address(bytes20(userOp.initCode[0:20]));
+    //     require(factory == theFactory, "TokenPaymaster: wrong account factory");
+    // }
 
     /**
      * actual charge of user.

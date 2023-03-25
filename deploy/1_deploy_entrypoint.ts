@@ -16,7 +16,7 @@ const deployEntryPoint: DeployFunction = async function (hre: HardhatRuntimeEnvi
       deterministicDeployment: true
     })
   console.log('==entrypoint addr=', ret.address)
-/*
+
   const entryPointAddress = ret.address
   const w = await hre.deployments.deploy(
     'SimpleAccount', {
@@ -28,12 +28,6 @@ const deployEntryPoint: DeployFunction = async function (hre: HardhatRuntimeEnvi
 
   console.log('== wallet=', w.address)
 
-  const t = await hre.deployments.deploy('TestCounter', {
-    from,
-    deterministicDeployment: true
-  })
-  console.log('==testCounter=', t.address)
-  */
 }
 
 export default deployEntryPoint
