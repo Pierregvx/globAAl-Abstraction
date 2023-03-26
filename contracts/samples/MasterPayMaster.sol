@@ -8,7 +8,6 @@ contract MasterPayMaster {
     mapping(uint32 => BasePaymaster) public chainsPayMaster;
     IConnext public immutable connext;
     uint256 public immutable slippage = 10000;
-    OptimisticOracleV2Interface oo = OptimisticOracleV2Interface(0xA5B9d8a0B0Fa04Ba71BDD68069661ED5C0848884);
     struct Chain{
         uint32 chainId;
         uint32 domainId;
