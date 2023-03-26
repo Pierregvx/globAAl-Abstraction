@@ -2,14 +2,13 @@
 pragma solidity ^0.8.12;
 import {IConnext} from "@connext/interfaces/core/IConnext.sol";
 import "../../core/BasePaymaster.sol";
-// import "../../interfaces/IPaymaster.sol";
-import "hardhat/console.sol";
 
+// import "../../interfaces/IPaymaster.sol";
 contract MasterPayMaster {
     mapping(uint32 => BasePaymaster) public chainsPayMaster;
     IConnext public immutable connext;
     uint256 public immutable slippage = 10000;
-
+    OptimisticOracleV2Interface oo = OptimisticOracleV2Interface(0xA5B9d8a0B0Fa04Ba71BDD68069661ED5C0848884);
     struct Chain{
         uint32 chainId;
         uint32 domainId;
@@ -24,11 +23,13 @@ contract MasterPayMaster {
     function addAChain(uint32 chainId, uint32 domainId, address paymaster) public {
         chains.push(Chain(chainId, domainId, paymaster));
     }
+    
 
 
     function setPayMaster(uint32 chainId, BasePaymaster payMaster) public {
         chainsPayMaster[chainId] = payMaster;
     }
+   
 
     function addAmount(
         uint32 destinationDomain,
@@ -44,8 +45,6 @@ contract MasterPayMaster {
             callData,
             (string, uint256)
         );
-        console.log("funcSig", funcSig);
-        console.log("amount", amount);
 
         connext.xcall{value: relayerFee}(
             destinationDomain, // _destination: Domain ID of the destination chain
@@ -57,13 +56,16 @@ contract MasterPayMaster {
             callData // _callData: the encoded calldata to send
         );
     }
-    function depositOnL2(uint32 destinationDomain, uint256 relayerFee,uint256 amount) public {
+    function depositOnL2(uint32 destinationDomain, uint256 relayerFee,uint256 amount) public payable {
         sendMessageFromL1(destinationDomain, relayerFee, amount, "deposit(uint256)");
     }
-    function wlAccountOnL2(uint32 destinationDomain, uint256 relayerFee,address account) public {
+    function wlAccountOnL2(uint32 destinationDomain, uint256 relayerFee,address account) public payable {
         sendMessageFromL1(destinationDomain, relayerFee, uint256(uint160(account)), "wlAccount(uint256)");
     }
-    function freezeAccountOnL2(uint32 destinationDomain, uint256 relayerFee,address account) public {
+    function unWlAccountOnL2(uint32 destinationDomain, uint256 relayerFee,address account) public payable {
+        sendMessageFromL1(destinationDomain, relayerFee, uint256(uint160(account)), "unWlAccount(uint256)");
+    }
+    function freezeAccountOnL2(uint32 destinationDomain, uint256 relayerFee,address account) public payable {
         // call the freezeAccount function on the L2 contract for each chain
         for(uint i = 0; i < chains.length; i++){
             if(chains[i].chainId == destinationDomain){
@@ -76,7 +78,7 @@ contract MasterPayMaster {
         uint256 relayerFee,
         uint256 depositAmount,
         string memory message
-    ) public {
+    ) public payable{
         bytes memory callData = abi.encode(
             message,
             depositAmount

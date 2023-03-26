@@ -59,6 +59,11 @@ const config: HardhatUserConfig = {
     localgeth: { url: "http://localgeth:8545" },
     goerli: getNetwork("goerli"),
     sepolia: getNetwork("sepolia"),
+    mumbai: {
+      url:"https://polygon-mumbai.g.alchemy.com/v2/6UhsPRKR79e4fSzMo590glSbly-BYewd",
+      accounts: account,
+
+    },
     proxy: getNetwork1("http://localhost:8545"),
   },
   mocha: {
@@ -66,8 +71,9 @@ const config: HardhatUserConfig = {
   },
 
   etherscan: {
-    apiKey: "E875E9XHFVBD2YCBSBTZPE72Q1156U8PEQ",
+    apiKey: "QII8PZIAUI7T8DYMUQIS3R8DXE83JEMH48",
   },
+
 };
 
 // coverage chokes on the "compilers" settings
